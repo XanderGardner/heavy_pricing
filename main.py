@@ -3,7 +3,12 @@ import sys
 import openpyxl as pyxl
 import shutil
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
+from threading import Thread
+
 
 
 def getExcelValues():
@@ -70,18 +75,16 @@ def resource_path(relative_path):
         base_path = os.path.dirname(__file__)
     return os.path.join(base_path, relative_path)
 
-# https://www.zacoding.com/en/post/python-selenium-to-exe/
 def scrape(data):
-    # constants
-    driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'))    
+    # constants and variables
+    MAX_THREADS = 10
     n = len(data['Emco'])
     a1 = [None] * n
     a2 = [None] * n
     a3 = [None] * n
 
-    # scrape data to fill Auction Values (for a1)
-    driver.get("https://usedequipmentguide.com/")
-
+    # create search terms
+    search_terms = [None] * n
     for i in range(n):
         terms = []
         if data['Manufacturer'][i]:
@@ -91,12 +94,50 @@ def scrape(data):
         if data['ModelYr'][i]:
             terms.append(data['ModelYr'][i])
         search_term = ' '.join(str(term) for term in terms)
-        a2[i] = len(search_term)
         if len(search_term) <= 8 and data['Description'][i]:
-            a1[i] = f"{search_term} {data['Description'][i]}"
+            search_terms[i] = f"{search_term} {data['Description'][i]}"
         else:
-            a1[i] = search_term
+            search_terms[i] = search_term
+    
+    # https://usedequipmentguide.com/
+    def scrape_task1(index):
+        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe')) 
+        driver.get(f"https://usedequipmentguide.com/listings?query={search_terms[index]}")
+        a2[index] = f"https://usedequipmentguide.com/listings?query={search_terms[index]}"
+        try:
+            element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "Layer_1"))
+            )
+            elements = driver.find_elements(by=By.CSS_SELECTOR, value="span.Span-hup779-0.sc-16afded-0.kzgLyd")
+            # pick most relavent
+            i = len(elements) - 1
+            while i >= 0:
+                if elements[i].text != "AUCTION" and elements[i].text != "Price Unavailable":
+                    a1[index] = elements[i].text
+                    break
+                i -= 1
+            
+        finally:
+            driver.quit()
 
+    
+    n1 = 200 # number of items to scrape
+    i = 0
+    while i < n1:
+        threads = [None] * MAX_THREADS
+        ti = 0
+        while ti < MAX_THREADS and i < n1:
+            threads[ti] = Thread(target=scrape_task1, args=(i,))
+            threads[ti].start()
+            i += 1
+            ti += 1
+
+        for j in range(ti):
+            threads[j].join()
+
+
+    # set found prices and return
+    
     prices = {
         'Auction Value' : a1,
         'Market Value' : a2,
@@ -111,9 +152,6 @@ def setExcelPrices(prices):
     wb = pyxl.load_workbook('Equipment New List.xlsx')
     ws = wb.active
 
-    print('Auction Value')
-    print(prices['Auction Value'][0])
-
     row = 2
     while row < ws.max_row:
         ws[f'N{row}'] = prices['Auction Value'][row - 2]
@@ -122,8 +160,6 @@ def setExcelPrices(prices):
         row += 1
 
     wb.save('Equipment New List.xlsx')
-
-    return
 
 def main():
     # output notes from program
