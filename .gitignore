@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Input and Output Files
+*.xlsx
+temp_output.txt
