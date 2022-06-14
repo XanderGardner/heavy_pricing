@@ -2,10 +2,10 @@
 Tool for automatically pricing heavy machinery according to current online bid prices. 
 
 ## Input:
-- Excel File named "Equipment Master List.exsl" with columns A, B, C, ... being "EMCo", "Description", "VINNumber", "Manufacturer", "Model", "ModelYr", "OdoReading", "OdoDate", "HourReading", "HourDate", "Location", and "Complete"
+- Excel File named "Equipment Master List.xlsx" with columns A, B, C, ... being "EMCo", "Description", "VINNumber", "Manufacturer", "Model", "ModelYr", "OdoReading", "OdoDate", "HourReading", "HourDate", "Location", and "Complete"
 
 ## Output:
-- Excel File named "Equipment New List.exsl" which is a copy of "Equipment Master List.exsl" with additional columns for "Auction Value", "Market Value", and "Asking Value"
+- Excel File named "Equipment New List.xslx" which is a copy of "Equipment Master List.xslx" with additional columns for "Auction Value", "Market Value", and "Asking Value"
 - Text File name "temp_output.txt" for outputting results of running the executable
 
 ## Creating the Executable for Windows:
