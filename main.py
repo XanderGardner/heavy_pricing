@@ -10,15 +10,24 @@ from datetime import datetime
 from threading import Thread
 import time
 
-MAX_THREADS = 10
+MAX_THREADS = 10 # max reasonable number of threads as each thread has a chomium driver
+OFFSET = 2 # excel input data is offset by 2: 1 for 0 indexing and 1 for a row of titles
+OFFSET_ROWS = 2 # excel input data has 2 extra rows: first is headers, last row is totaled info
 
+# returns resource path for users environment given the relative path
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
+
+# imports data from 'Equipment New List.xlsx' and returns as a dictionary
 def getExcelValues():
-    # first row is table headers
-    # last row is totaled information
 
     wb = pyxl.load_workbook('Equipment New List.xlsx')
     ws = wb.active
-    n = ws.max_row - 2
+    n = ws.max_row - OFFSET_ROWS
 
     a1 = [None] * n
     a2 = [None] * n
@@ -69,22 +78,9 @@ def getExcelValues():
 
     return data
 
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.dirname(__file__)
-    return os.path.join(base_path, relative_path)
-
-# https://usedequipmentguide.com/
-def scrape1(data):
-    # constants and variables
+# create search term for each item in data and return as array of search term strings
+def get_search_terms(data):
     n = len(data['Emco'])
-    a1 = [None] * n
-    a2 = [None] * n
-    a3 = [None] * n
-
-    # create search terms
     search_terms = [None] * n
     for i in range(n):
         terms = []
@@ -99,7 +95,18 @@ def scrape1(data):
             search_terms[i] = f"{search_term} {data['Description'][i]}"
         else:
             search_terms[i] = search_term
+    return search_terms
+
+# scrape data from https://usedequipmentguide.com/ given a list of search terms
+# saves results to 'Equipment New List.xlsx' as it searches
+def scrape1(search_terms):
+    # constants and variables
+    n = len(search_terms)
+    a1 = [None] * n
+    a2 = [None] * n
+    a3 = [None] * n
     
+    # nested function for threaded scraping
     def scrape_task1(index):
         driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe')) 
         driver.get(f"https://usedequipmentguide.com/listings?query={search_terms[index]}")
@@ -107,8 +114,8 @@ def scrape1(data):
         try:
             ele = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "span.Span-hup779-0.sc-16afded-0.kzgLyd")
-            ))
-            time.sleep(1.5)
+            )) # will only wait for first result
+            time.sleep(1.5) # testing shows that an extra 1.5 seconds allows all results to finish
             elements = driver.find_elements(by=By.CSS_SELECTOR, value="span.Span-hup779-0.sc-16afded-0.kzgLyd")
             
             # pick most relavent result
@@ -139,13 +146,12 @@ def scrape1(data):
 
         # occasionally save what is found
         if i % s1 == 0:
-            row_start = i-s1+2 # shift by 2 since first row is col headers
+            row_start = i-s1+OFFSET
             arr_col_strs = ["N", "O", "P"]
             arr_values = [a1[i-s1:i], a2[i-s1:i], a3[i-s1:i]]
             tempSetExcel(arr_values, arr_col_strs, row_start)
 
     # set found prices and return
-    
     prices = {
         'Auction Value' : a1,
         'Market Value' : a2,
@@ -169,19 +175,16 @@ def tempSetExcel(arr_values, arr_col_strs, row_start):
     
     wb.save('Equipment New List.xlsx')
 
-
+# sets given final prices in 'Equipment New List.xlsx'
 def setExcelPrices(prices):
-    # first row is table headers
-    # last row is totaled information
-
     wb = pyxl.load_workbook('Equipment New List.xlsx')
     ws = wb.active
 
-    row = 2
+    row = 0 + OFFSET
     while row < ws.max_row:
-        ws[f'N{row}'] = prices['Auction Value'][row - 2]
-        ws[f'O{row}'] = prices['Market Value'][row - 2]
-        ws[f'P{row}'] = prices['Asking Value'][row - 2]
+        ws[f'N{row}'] = prices['Auction Value'][row - OFFSET]
+        ws[f'O{row}'] = prices['Market Value'][row - OFFSET]
+        ws[f'P{row}'] = prices['Asking Value'][row - OFFSET]
         row += 1
 
     wb.save('Equipment New List.xlsx')
@@ -199,8 +202,9 @@ def main():
     # get data from 'Equipment New List.xlsx'
     data = getExcelValues()
 
-    # get online prices from data
-    prices = scrape1(data) # https://usedequipmentguide.com/
+    # get online prices
+    search_terms = get_search_terms(data)
+    prices = scrape1(search_terms) # https://usedequipmentguide.com/
 
     # writes price_data to 'Equipment New List.xlsx'
     setExcelPrices(prices)
@@ -211,4 +215,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
