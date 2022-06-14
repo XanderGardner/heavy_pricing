@@ -8,8 +8,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 from threading import Thread
+import time
 
-
+MAX_THREADS = 10
 
 def getExcelValues():
     # first row is table headers
@@ -75,9 +76,9 @@ def resource_path(relative_path):
         base_path = os.path.dirname(__file__)
     return os.path.join(base_path, relative_path)
 
-def scrape(data):
+# https://usedequipmentguide.com/
+def scrape1(data):
     # constants and variables
-    MAX_THREADS = 10
     n = len(data['Emco'])
     a1 = [None] * n
     a2 = [None] * n
@@ -99,31 +100,33 @@ def scrape(data):
         else:
             search_terms[i] = search_term
     
-    # https://usedequipmentguide.com/
     def scrape_task1(index):
         driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe')) 
         driver.get(f"https://usedequipmentguide.com/listings?query={search_terms[index]}")
         a2[index] = f"https://usedequipmentguide.com/listings?query={search_terms[index]}"
         try:
-            element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, "Layer_1"))
-            )
+            ele = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "span.Span-hup779-0.sc-16afded-0.kzgLyd")
+            ))
+            time.sleep(1.5)
             elements = driver.find_elements(by=By.CSS_SELECTOR, value="span.Span-hup779-0.sc-16afded-0.kzgLyd")
-            # pick most relavent
-            i = len(elements) - 1
-            while i >= 0:
+            
+            # pick most relavent result
+            i = 0
+            while i < len(elements):
                 if elements[i].text != "AUCTION" and elements[i].text != "Price Unavailable":
                     a1[index] = elements[i].text
                     break
-                i -= 1
-            
+                i += 1
+        
         finally:
             driver.quit()
-
     
-    n1 = 200 # number of items to scrape
+    n1 = 45 # number of items to scrape
+    s1 = 50 # save excel after every s1 elements scraped
     i = 0
     while i < n1:
+        # run next set of threads
         threads = [None] * MAX_THREADS
         ti = 0
         while ti < MAX_THREADS and i < n1:
@@ -131,10 +134,15 @@ def scrape(data):
             threads[ti].start()
             i += 1
             ti += 1
-
         for j in range(ti):
             threads[j].join()
 
+        # occasionally save what is found
+        if i % s1 == 0:
+            row_start = i-s1+2 # shift by 2 since first row is col headers
+            arr_col_strs = ["N", "O", "P"]
+            arr_values = [a1[i-s1:i], a2[i-s1:i], a3[i-s1:i]]
+            tempSetExcel(arr_values, arr_col_strs, row_start)
 
     # set found prices and return
     
@@ -144,6 +152,23 @@ def scrape(data):
         'Asking Value' : a3
     }
     return prices
+
+# arr_values is 2d array. Each item is an array representing data for a column 
+# arr_col_strs is array of strings. arr_col_strs at index i is the col for arr_values at i
+# tempSetExcel will set the values in the respective columns in 'Equipment New List.xlsx',
+# starting at the row row_start
+def tempSetExcel(arr_values, arr_col_strs, row_start):
+    wb = pyxl.load_workbook('Equipment New List.xlsx')
+    ws = wb.active
+
+    for col_index in range(len(arr_col_strs)):
+        row_xlsx = row_start
+        for row_index in range(len(arr_values[col_index])):
+            ws[f'{arr_col_strs[col_index]}{row_xlsx}'] = arr_values[col_index][row_index]
+            row_xlsx += 1
+    
+    wb.save('Equipment New List.xlsx')
+
 
 def setExcelPrices(prices):
     # first row is table headers
@@ -175,7 +200,7 @@ def main():
     data = getExcelValues()
 
     # get online prices from data
-    prices = scrape(data)
+    prices = scrape1(data) # https://usedequipmentguide.com/
 
     # writes price_data to 'Equipment New List.xlsx'
     setExcelPrices(prices)
