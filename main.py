@@ -16,7 +16,9 @@ OFFSET = 2 # excel input data is offset by 2: 1 for 0 indexing and 1 for a row o
 OFFSET_ROWS = 2 # excel input data has 2 extra rows: first is headers, last row is totaled info
 
 SAVE_EVERY = 50 # save excel after every SAVE_EVERY number of elements scraped
-MAX_NUM_TO_SCRAPE = 90 # max number of elements to scrape (set high to scrape everything)
+MAX_NUM_TO_SCRAPE = 10 # max number of elements to scrape (set high to scrape everything)
+MAX_INCREASE = 2 # max amount allowed for given auction value to increase before result is not used
+MAX_DECREASE = 0.4 # max amount allowed for given auction value to decrease before result is not used
 
 # returns resource path for users environment given the relative path
 def resource_path(relative_path):
@@ -48,6 +50,9 @@ def getExcelValues():
     a11 = [None] * n
     a12 = [None] * n
     a13 = [None] * n
+    a14 = [None] * n
+    a15 = [None] * n
+    a16 = [None] * n
     
     i = 0
     while i != n:
@@ -64,6 +69,9 @@ def getExcelValues():
         a11[i] = ws[f'K{i+2}'].value
         a12[i] = ws[f'L{i+2}'].value
         a13[i] = ws[f'M{i+2}'].value
+        a14[i] = ws[f'M{i+2}'].value
+        a15[i] = ws[f'M{i+2}'].value
+        a16[i] = ws[f'M{i+2}'].value
         i += 1
     
     data = {
@@ -79,7 +87,10 @@ def getExcelValues():
         'HourReading' : a10,
         'HourData' : a11,
         'Location' : a12,
-        'Complete' : a13
+        'Complete' : a13,
+        'Auction Value' : a14,
+        'Market Value' : a15,
+        'Asking Value' : a16
     }
 
     return data
@@ -102,6 +113,10 @@ def get_search_terms(data):
         else:
             search_terms[i] = search_term
     return search_terms
+
+# check if found price is reasonable based on MAX_INCREASE and MAX_DECREASE
+def isValidPrice():
+    return True # to be implemented
 
 # scrape data from https://usedequipmentguide.com/ given a list of search terms
 # saves results to 'Equipment New List.xlsx' as it searches
@@ -231,10 +246,10 @@ def scrapeAuctionValues(search_terms):
             results_num_el = driver.find_elements(by=By.CSS_SELECTOR, value="span.section-notice__main")
             main_results = driver.find_elements(by=By.CSS_SELECTOR, value="h1.srp-controls__count-heading")
             main_num = main_results[0].text[0]
-            str_dollar_value = str(elements[1].text)
+            str_dollar_value = str(elements[1].text)  # 2nd element is the 1st most relevent price
             dollar_value = parseDollarValue(str_dollar_value)
             if (len(results_num_el) == 0 or results_num_el[0].text[0] != "0") and dollar_value > 999 and main_num != "0":
-                avf[index] = dollar_value # 2nd element is the 1st most relevent price
+                avf[index] = dollar_value
                 
         finally:
             driver.quit()
@@ -245,6 +260,85 @@ def scrapeAuctionValues(search_terms):
         threads = [None] * MAX_THREADS
         ti = 0
         while ti < MAX_THREADS and i < n:
+            threads[ti] = Thread(target=scrape_task, args=(i,))
+            threads[ti].start()
+            i += 1
+            ti += 1
+        for j in range(ti):
+            threads[j].join()
+
+        # occasionally save what is found
+        if i % SAVE_EVERY == 0:
+            row_start = i-SAVE_EVERY
+            temp_dict = {
+                'Auction Value Found' : avf[i-SAVE_EVERY:i],
+                'Auction Value Link' : avl[i-SAVE_EVERY:i]
+            }
+            tempSetExcel(temp_dict, row_start)
+
+    # save final results
+    row_start = i-SAVE_EVERY
+    # corner case: SAVE_EVERY is large and row start becomes negative
+    if row_start < 0:
+        row_start = 0
+    temp_dict = {
+        'Auction Value Found' : avf[i-SAVE_EVERY:i],
+        'Auction Value Link' : avl[i-SAVE_EVERY:i]
+    }
+    tempSetExcel(temp_dict, row_start)
+
+    # set found prices and return
+    dict = {
+        'Auction Value Found' : avf,
+        'Auction Value Link' : avl
+    }
+    return dict
+
+# scrape data from machinery trader given list of search terms
+# saves results to 'Equipment New List.xlsx' as it searches
+def scrapeAuctionValues2(search_terms):
+# constants and variables
+    n = len(search_terms)
+    avf = [None] * n # auction values found
+    avl = [None] * n # auction value links
+    
+    # parse ebay data: convert given dollar string to an int
+    def parseDollarValue(money_str):
+        str = money_str[5:-3] # remove "USD $" and pennies
+        value = 0.01 * int(money_str[-2:]) # value in the pennies
+        i = len(str) - 1
+        multiplier = 1
+        while i >= 0:
+            if (len(str) - i) % 4 == 0:
+                i -= 1
+                continue
+            else:
+                value += multiplier * int(str[i])
+                multiplier *= 10
+                i -= 1
+        return value
+
+    # nested function for threaded scraping
+    def scrape_task(index):
+        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe')) 
+        driver.get(f"https://www.machinerytrader.com/listings/search?ListingType=Auction%20Results&keywords={search_terms[index]}")
+        avl[index] = f"https://www.machinerytrader.com/listings/search?ListingType=Auction%20Results&keywords={search_terms[index]}"
+
+        time.sleep(10) # wait time
+        
+        elements = driver.find_elements(by=By.CSS_SELECTOR, value="span.price")
+        dollar_value = parseDollarValue(str(elements[0].text))
+        if dollar_value > 999:
+            avf[index] = dollar_value
+
+        driver.quit()
+    
+    i = 0
+    while i < n:
+        # run next set of threads
+        threads = [None] * 1
+        ti = 0
+        while ti < 1 and i < n:
             threads[ti] = Thread(target=scrape_task, args=(i,))
             threads[ti].start()
             i += 1
@@ -378,8 +472,10 @@ def main():
 
     # get online prices
     search_terms = get_search_terms(data)
-    dict = scrapeAskingValues(search_terms)
-    dict.update(scrapeAuctionValues(search_terms))
+    dict = {}
+    # dict.update(scrapeAskingValues(search_terms))
+    # dict.update(scrapeAuctionValues(search_terms))
+    # dict.update(scrapeAuctionValues2(search_terms))
 
     # writes price_data to 'Equipment New List.xlsx'
     dict['Search Terms'] = search_terms
