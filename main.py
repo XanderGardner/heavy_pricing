@@ -1,5 +1,6 @@
 import os
 import sys
+from unittest import result
 import openpyxl as pyxl
 import shutil
 from selenium import webdriver
@@ -15,7 +16,7 @@ OFFSET = 2 # excel input data is offset by 2: 1 for 0 indexing and 1 for a row o
 OFFSET_ROWS = 2 # excel input data has 2 extra rows: first is headers, last row is totaled info
 
 SAVE_EVERY = 50 # save excel after every SAVE_EVERY number of elements scraped
-MAX_NUM_TO_SCRAPE = 10 # max number of elements to scrape (set high to scrape everything)
+MAX_NUM_TO_SCRAPE = 90 # max number of elements to scrape (set high to scrape everything)
 
 # returns resource path for users environment given the relative path
 def resource_path(relative_path):
@@ -227,9 +228,14 @@ def scrapeAuctionValues(search_terms):
             elements = driver.find_elements(by=By.CSS_SELECTOR, value="span.POSITIVE")
             
             # pick only relevent trucks and cars data
-            if parseDollarValue(elements[1].text) > 999:
-                avf[index] = parseDollarValue(elements[1].text) # 2nd element is the 1st most relevent price
-        
+            results_num_el = driver.find_elements(by=By.CSS_SELECTOR, value="span.section-notice__main")
+            main_results = driver.find_elements(by=By.CSS_SELECTOR, value="h1.srp-controls__count-heading")
+            main_num = main_results[0].text[0]
+            str_dollar_value = str(elements[1].text)
+            dollar_value = parseDollarValue(str_dollar_value)
+            if (len(results_num_el) == 0 or results_num_el[0].text[0] != "0") and dollar_value > 999 and main_num != "0":
+                avf[index] = dollar_value # 2nd element is the 1st most relevent price
+                
         finally:
             driver.quit()
     
