@@ -1,8 +1,7 @@
 import os
-import random
+from os.path import exists
 import math
 import sys
-from unittest import result
 import openpyxl as pyxl
 import shutil
 from selenium import webdriver
@@ -13,14 +12,14 @@ from datetime import datetime
 from threading import Thread
 import time
 
+SAVE_EVERY = 50 # save excel after every SAVE_EVERY number of elements scraped
+MAX_NUM_TO_SCRAPE = 99999 # max number of elements to scrape (set high to scrape everything)
+MAX_INCREASE = 2 # max amount allowed for given auction value to increase before result is not used
+MAX_DECREASE = 0.4 # max amount allowed for given auction value to decrease before result is not used
+
 MAX_THREADS = 10 # max reasonable number of threads as each thread has a chomium driver
 OFFSET = 2 # excel input data is offset by 2: 1 for 0 indexing and 1 for a row of titles
 OFFSET_ROWS = 2 # excel input data has 2 extra rows: first is headers, last row is totaled info
-
-SAVE_EVERY = 50 # save excel after every SAVE_EVERY number of elements scraped
-MAX_NUM_TO_SCRAPE = 500 # max number of elements to scrape (set high to scrape everything)
-MAX_INCREASE = 2 # max amount allowed for given auction value to increase before result is not used
-MAX_DECREASE = 0.4 # max amount allowed for given auction value to decrease before result is not used
 
 # returns resource path for users environment given the relative path
 def resource_path(relative_path):
@@ -55,6 +54,13 @@ def getExcelValues():
     a14 = [None] * n
     a15 = [None] * n
     a16 = [None] * n
+    a17 = [None] * n
+    a18 = [None] * n
+    a19 = [None] * n
+    a20 = [None] * n
+    a21 = [None] * n
+    a22 = [None] * n
+    a23 = [None] * n
     
     i = 0
     while i != n:
@@ -74,6 +80,14 @@ def getExcelValues():
         a14[i] = ws[f'N{i+OFFSET}'].value
         a15[i] = ws[f'O{i+OFFSET}'].value
         a16[i] = ws[f'P{i+OFFSET}'].value
+        a17[i] = ws[f'Q{i+OFFSET}'].value
+        a18[i] = ws[f'R{i+OFFSET}'].value
+        a19[i] = ws[f'S{i+OFFSET}'].value
+        a20[i] = ws[f'T{i+OFFSET}'].value
+        a21[i] = ws[f'U{i+OFFSET}'].value
+        a22[i] = ws[f'V{i+OFFSET}'].value
+        a23[i] = ws[f'W{i+OFFSET}'].value
+        
         i += 1
     
     data = {
@@ -92,10 +106,34 @@ def getExcelValues():
         'Complete' : a13,
         'Auction Value' : a14,
         'Market Value' : a15,
-        'Asking Value' : a16
+        'Asking Value' : a16,
+
+        'Market Value Found' : a17,
+        'Auction Value Found' : a18,
+        'Auction Value Link' : a19,
+        'General Market Value Found' : a20,
+        'General Market Value Link' : a21,
+        'Asking Value Found' : a22,
+        'Asking Value Link' : a23,
     }
 
     return data
+
+# create dict from previously found scraped data given in data
+def getDict(data):
+    def int_none(val):
+        if val:
+            return int(val)
+        return None
+    dict = {}
+    dict['Market Value Found'] = list(map(int_none, data['Market Value Found']))
+    dict['Auction Value Found'] = list(map(int_none, data['Auction Value Found']))
+    dict['Auction Value Link'] = data['Auction Value Link'][:]
+    dict['General Market Value Found'] = list(map(int_none, data['General Market Value Found']))
+    dict['General Market Value Link'] = data['General Market Value Link'][:]
+    dict['Asking Value Found'] = list(map(int_none, data['Asking Value Found']))
+    dict['Asking Value Link'] = data['Asking Value Link'][:]
+    return dict
 
 # create search term for each item in data and return as array of search term strings
 def get_search_terms(data):
@@ -117,12 +155,14 @@ def get_search_terms(data):
     return search_terms
 
 # scrape data from https://usedequipmentguide.com/ given a list of search terms
+# in dict, updates dict with new found values and links with keys 'Asking Value Link' and 'Asking Value Found', and
 # saves results to 'Equipment New List.xlsx' as it searches
-def scrapeAskingValues(search_terms):
+def scrapeAskingValues(dict):
     # constants and variables
+    search_terms = dict['Search Terms']
     n = len(search_terms)
-    avf = [None] * n # asking values found
-    avl = [None] * n # asking value links
+    avf = dict['Asking Value Found'] # asking values found
+    avl = dict['Asking Value Link'] # asking value links
     
     # parse data: convert given dollar string to an int
     def parseDollarValue(money_str):
@@ -163,7 +203,11 @@ def scrapeAskingValues(search_terms):
         finally:
             driver.quit()
     
-    i = 0
+    i = n - 1
+    # start scraping where it was last stopped
+    while not (i == -1 or avf[i]):
+        i -= 1
+    i += 1  
     while i < n:
         # run next set of threads
         threads = [None] * MAX_THREADS
@@ -183,7 +227,7 @@ def scrapeAskingValues(search_terms):
                 'Asking Value Found' : avf[i-SAVE_EVERY:i],
                 'Asking Value Link' : avl[i-SAVE_EVERY:i]
             }
-            # tempSetExcel(temp_dict, row_start)
+            tempSetExcel(temp_dict, row_start)
 
     # save final results
     row_start = i-SAVE_EVERY
@@ -194,22 +238,19 @@ def scrapeAskingValues(search_terms):
         'Asking Value Found' : avf[i-SAVE_EVERY:i],
         'Asking Value Link' : avl[i-SAVE_EVERY:i]
     }
-    # tempSetExcel(temp_dict, row_start)
+    tempSetExcel(temp_dict, row_start)
 
-    # set found prices and return
-    dict = {
-        'Asking Value Found' : avf,
-        'Asking Value Link' : avl
-    }
-    return dict
+    return 1
 
 # scrape data from ebay's trucks and cars site given a list of search terms
+# in dict, updates dict with new found values and links with keys 'Auction Value Link' and 'Auction Value Found', and
 # saves results to 'Equipment New List.xlsx' as it searches
-def scrapeAuctionValues(search_terms):
+def scrapeAuctionValues(dict):
     # constants and variables
+    search_terms = dict['Search Terms']
     n = len(search_terms)
-    avf = [None] * n # auction values found
-    avl = [None] * n # auction value links
+    avf = dict['Auction Value Found'] # auction values found
+    avl = dict['Auction Value Link'] # auction value links
     
     # parse ebay data: convert given dollar string to an int
     def parseDollarValue(money_str):
@@ -252,7 +293,11 @@ def scrapeAuctionValues(search_terms):
         finally:
             driver.quit()
     
-    i = 0
+    i = n - 1
+    # start scraping where it was last stopped
+    while not (i == -1 or avf[i]):
+        i -= 1
+    i += 1  
     while i < n:
         # run next set of threads
         threads = [None] * MAX_THREADS
@@ -272,7 +317,7 @@ def scrapeAuctionValues(search_terms):
                 'Auction Value Found' : avf[i-SAVE_EVERY:i],
                 'Auction Value Link' : avl[i-SAVE_EVERY:i]
             }
-            # tempSetExcel(temp_dict, row_start)
+            tempSetExcel(temp_dict, row_start)
 
     # save final results
     row_start = i-SAVE_EVERY
@@ -283,22 +328,19 @@ def scrapeAuctionValues(search_terms):
         'Auction Value Found' : avf[i-SAVE_EVERY:i],
         'Auction Value Link' : avl[i-SAVE_EVERY:i]
     }
-    # tempSetExcel(temp_dict, row_start)
+    tempSetExcel(temp_dict, row_start)
 
-    # set found prices and return
-    dict = {
-        'Auction Value Found' : avf,
-        'Auction Value Link' : avl
-    }
-    return dict
+    return 1
 
 # scrape data from google's site given a list of search terms
+# in dict, updates dict with new found values and links with keys 'General Market Value Link' and 'General Market Value Found', and
 # saves results to 'Equipment New List.xlsx' as it searches
-def scrapeGeneralMarketValues(search_terms):
+def scrapeGeneralMarketValues(dict):
     # constants and variables
+    search_terms = dict['Search Terms']
     n = len(search_terms)
-    avf = [None] * n # auction values found
-    avl = [None] * n # auction value links
+    mvf = dict['General Market Value Found'] # general market values found
+    mvl = dict['General Market Value Link'] # general market value links
     
     # google: find dollar signs
     def parseDollarValue(dom_text):
@@ -345,7 +387,7 @@ def scrapeGeneralMarketValues(search_terms):
     def scrape_task(index):
         driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe')) 
         driver.get(f"https://www.google.com/search?q=hi{search_terms[index]} used")
-        avl[index] = f"https://www.google.com/search?q=hi{search_terms[index]} used"
+        mvl[index] = f"https://www.google.com/search?q=hi{search_terms[index]} used"
         try:
             WebDriverWait(driver, 10).until(EC.presence_of_element_located(
                 (By.ID, "main")
@@ -356,12 +398,16 @@ def scrapeGeneralMarketValues(search_terms):
             dom_text = main_element.text
             dollar_value = parseDollarValue(dom_text)
             if dollar_value > 999:
-                avf[index] = dollar_value
+                mvf[index] = dollar_value
                 
         finally:
             driver.quit()
     
-    i = 0
+    i = n - 1
+    # start scraping where it was last stopped
+    while not (i == -1 or mvf[i]):
+        i -= 1
+    i += 1  
     while i < n:
         # run next set of threads
         threads = [None] * MAX_THREADS
@@ -378,8 +424,8 @@ def scrapeGeneralMarketValues(search_terms):
         if i % SAVE_EVERY == 0:
             row_start = i-SAVE_EVERY
             temp_dict = {
-                'General Market Value Found' : avf[i-SAVE_EVERY:i],
-                'General Market Value Link' : avl[i-SAVE_EVERY:i]
+                'General Market Value Found' : mvf[i-SAVE_EVERY:i],
+                'General Market Value Link' : mvl[i-SAVE_EVERY:i]
             }
             tempSetExcel(temp_dict, row_start)
 
@@ -389,17 +435,13 @@ def scrapeGeneralMarketValues(search_terms):
     if row_start < 0:
         row_start = 0
     temp_dict = {
-        'General Market Value Found' : avf[i-SAVE_EVERY:i],
-        'General Market Value Link' : avl[i-SAVE_EVERY:i]
+        'General Market Value Found' : mvf[i-SAVE_EVERY:i],
+        'General Market Value Link' : mvl[i-SAVE_EVERY:i]
     }
     tempSetExcel(temp_dict, row_start)
 
     # set found prices and return
-    dict = {
-        'General Market Value Found' : avf,
-        'General Market Value Link' : avl
-    }
-    return dict
+    return 1
 
 # adds validated market values to dict with the key "Market Value Found" given the dict has the key-value 
 # pairs for "Auction Value Found" and "General Market Value Found" and "Asking Value Found" 
@@ -415,16 +457,23 @@ def setMarketValues(dict, data):
     mv  = data["Market Value"]
     asv = data["Asking Value"]
 
+    auvf_link = dict["Auction Value Link"]
+    gmvf_link = dict["General Market Value Link"]
+    asvf_link = dict["Asking Value Link"]
+
     market_values = [None] * n
     successes = 0
     for i in range(n):
         # remove found items that have changed too much from previous research
         if auvf[i] and auv[i] and (auvf[i] > auv[i] * MAX_INCREASE or auvf[i] < auv[i] * MAX_DECREASE):
             auvf[i] = None
+            auvf_link[i] = None
         if gmvf[i] and mv[i] and (gmvf[i] > mv[i] * MAX_INCREASE or gmvf[i] < mv[i] * MAX_DECREASE):
             gmvf[i] = None
+            gmvf_link[i] = None
         if asvf[i] and asv[i] and (asvf[i] > asv[i] * MAX_INCREASE or asvf[i] < asv[i] * MAX_DECREASE):
             asvf[i] = None
+            asvf_link[i] = None
         
         increase_auction = 1.1
         decrease_asking = 0.9
@@ -518,7 +567,6 @@ def tempSetExcel(dict, row_start):
     wb.save('Equipment New List.xlsx')
 
 
-
 # sets given final prices in 'Equipment New List.xlsx'
 def setExcel(dict):
     wb = pyxl.load_workbook('Equipment New List.xlsx')
@@ -571,21 +619,23 @@ def main():
     # create a copy of the master
     original = r'Equipment Master List.xlsx'
     target = r'Equipment New List.xlsx'
-    shutil.copyfile(original, target)
+    if not exists(target):
+        shutil.copyfile(original, target)
 
     # get data from 'Equipment New List.xlsx'
     data = getExcelValues()
 
     # get online prices and create dictionary
     search_terms = get_search_terms(data)
-    dict = {}
+    dict = getDict(data)
     dict['Search Terms'] = search_terms
-    dict.update(scrapeAskingValues(search_terms))
-    dict.update(scrapeAuctionValues(search_terms))
-    dict.update(scrapeGeneralMarketValues(search_terms))
+    scrapeAskingValues(dict)
+    scrapeAuctionValues(dict)
+    scrapeGeneralMarketValues(dict)
 
-    # calculate market price and validate it if able
-    setMarketValues(dict, data)
+    # calculate market price and validate values found
+    success_percent = setMarketValues(dict, data)
+    file.write(f"Successful market values found: {round(success_percent * 100, 2)}%")
 
     # write data in dict to 'Equipment New List.xlsx'
     setExcel(dict)
@@ -596,95 +646,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Unused now; potential future use
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# scrape data from machinery trader given list of search terms
-# saves results to 'Equipment New List.xlsx' as it searches
-def scrapeAuctionValues2(search_terms):
-# constants and variables
-    n = len(search_terms)
-    avf = [None] * n # auction values found
-    avl = [None] * n # auction value links
-    
-    # convert given dollar string to an int
-    def parseDollarValue(money_str):
-        str = money_str[5:-3] # remove "USD $" and pennies
-        value = 0.01 * int(money_str[-2:]) # value in the pennies
-        i = len(str) - 1
-        multiplier = 1
-        while i >= 0:
-            if (len(str) - i) % 4 == 0:
-                i -= 1
-                continue
-            else:
-                value += multiplier * int(str[i])
-                multiplier *= 10
-                i -= 1
-        return value
-
-    # nested function for threaded scraping
-    def scrape_task(index):
-        time.sleep(random.uniform(0.2, 0.7))
-        user_agent = 'Chrome/73.0.3683.86'
-        username = os.getenv("USERNAME")
-        userProfile = "C:\\Users\\" + username + "\\AppData\\Local\\Google\\Chrome\\User Data\\Default"
-        options = webdriver.ChromeOptions()
-        options.add_argument(f'user-agent={user_agent}')
-        options.add_argument("user-data-dir={}".format(userProfile))
-        options.add_argument("--enable-javascript")
-        time.sleep(random.uniform(0.2, 0.7))
-        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), chrome_options=options)
-        driver.get(f"https://www.machinerytrader.com/listings/search?ListingType=Auction%20Results&keywords={search_terms[index]}")
-        avl[index] = f"https://www.machinerytrader.com/listings/search?ListingType=Auction%20Results&keywords={search_terms[index]}"
-
-        time.sleep(random.uniform(9.9, 10.5)) # wait time
-        
-        elements = driver.find_elements(by=By.CSS_SELECTOR, value="span.price")
-        dollar_value = parseDollarValue(str(elements[0].text))
-        if dollar_value > 999:
-            avf[index] = dollar_value
-
-        driver.quit()
-    
-    i = 0
-    while i < n:
-        # run next set of threads
-        threads = [None] * 1
-        ti = 0
-        while ti < 1 and i < n:
-            threads[ti] = Thread(target=scrape_task, args=(i,))
-            threads[ti].start()
-            i += 1
-            ti += 1
-        for j in range(ti):
-            threads[j].join()
-
-        # occasionally save what is found
-        if i % SAVE_EVERY == 0:
-            row_start = i-SAVE_EVERY
-            temp_dict = {
-                'Auction Value Found' : avf[i-SAVE_EVERY:i],
-                'Auction Value Link' : avl[i-SAVE_EVERY:i]
-            }
-            tempSetExcel(temp_dict, row_start)
-
-    # save final results
-    row_start = i-SAVE_EVERY
-    # corner case: SAVE_EVERY is large and row start becomes negative
-    if row_start < 0:
-        row_start = 0
-    temp_dict = {
-        'Auction Value Found' : avf[i-SAVE_EVERY:i],
-        'Auction Value Link' : avl[i-SAVE_EVERY:i]
-    }
-    tempSetExcel(temp_dict, row_start)
-
-    # set found prices and return
-    dict = {
-        'Auction Value Found' : avf,
-        'Auction Value Link' : avl
-    }
-    return dict
