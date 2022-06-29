@@ -635,7 +635,7 @@ def main():
 
     # calculate market price and validate values found
     success_percent = setMarketValues(dict, data)
-    file.write(f"Successful market values found: {round(success_percent * 100, 2)}%")
+    file.write(f"Successful market values found: {round(success_percent * 100, 2)}%\n")
 
     # write data in dict to 'Equipment New List.xlsx'
     setExcel(dict)
