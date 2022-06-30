@@ -8,14 +8,17 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from threading import Thread
 import time
 
+# INPUT/ CONSTANTS
 SAVE_EVERY = 50 # save excel after every SAVE_EVERY number of elements scraped
 MAX_NUM_TO_SCRAPE = 99999 # max number of elements to scrape (set high to scrape everything)
 MAX_INCREASE = 2 # max amount allowed for given auction value to increase before result is not used
 MAX_DECREASE = 0.4 # max amount allowed for given auction value to decrease before result is not used
+HEADLESS = True # if running with chrome browser showing
 
 MAX_THREADS = 10 # max reasonable number of threads as each thread has a chomium driver
 OFFSET = 2 # excel input data is offset by 2: 1 for 0 indexing and 1 for a row of titles
@@ -154,6 +157,30 @@ def get_search_terms(data):
             search_terms[i] = search_term
     return search_terms
 
+# create multi-round search term for each item in data and return as array of array of search term strings
+def get_adv_search_terms(data):
+    n = len(data['Emco'])
+    adv_search_terms = [None] * n
+    for i in range(n):
+        # find many ways of search for this item
+        manufacturer = data['Manufacturer'][i]
+        model = data['Model'][i]
+        description = data['Description'][i]
+        model_year = data['ModelYr'][i]
+
+        curr_terms = []
+        if description and model and model_year:
+            curr_terms.append(' '.join([description, model, model_year, "used price"]))
+        if description and model:
+            curr_terms.append(' '.join([description, model, "used price"]))
+        if description and manufacturer:
+            curr_terms.append(' '.join([description, manufacturer, "used price"]))
+        if manufacturer and model and model_year:
+            curr_terms.append(' '.join([manufacturer, model, model_year, "used price"]))
+        adv_search_terms[i] = curr_terms
+        
+    return adv_search_terms
+
 # scrape data from https://usedequipmentguide.com/ given a list of search terms
 # in dict, updates dict with new found values and links with keys 'Asking Value Link' and 'Asking Value Found', and
 # saves results to 'Equipment New List.xlsx' as it searches
@@ -182,7 +209,10 @@ def scrapeAskingValues(dict):
 
     # nested function for threaded scraping
     def scrape_task(index):
-        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe')) 
+        chrome_options = Options()
+        if HEADLESS:
+            chrome_options.add_argument("--headless") 
+        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options) 
         driver.get(f"https://usedequipmentguide.com/listings?query={search_terms[index]}")
         avl[index] = f"https://usedequipmentguide.com/listings?query={search_terms[index]}"
         try:
@@ -270,7 +300,10 @@ def scrapeAuctionValues(dict):
 
     # nested function for threaded scraping
     def scrape_task(index):
-        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe')) 
+        chrome_options = Options()
+        if HEADLESS:
+            chrome_options.add_argument("--headless") 
+        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options) 
         driver.get(f"https://www.ebay.com/sch/i.html?_from=R40&_nkw={search_terms[index]}&_sacat=6001&rt=nc&LH_Sold=1&LH_Complete=1")
         avl[index] = f"https://www.ebay.com/sch/i.html?_from=R40&_nkw={search_terms[index]}&_sacat=6001&rt=nc&LH_Sold=1&LH_Complete=1"
         try:
@@ -338,6 +371,7 @@ def scrapeAuctionValues(dict):
 def scrapeGeneralMarketValues(dict):
     # constants and variables
     search_terms = dict['Search Terms']
+    adv_search_terms = dict['Advanced Search Terms']
     n = len(search_terms)
     mvf = dict['General Market Value Found'] # general market values found
     mvl = dict['General Market Value Link'] # general market value links
@@ -385,23 +419,31 @@ def scrapeGeneralMarketValues(dict):
 
     # nested function for threaded scraping
     def scrape_task(index):
-        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe')) 
-        driver.get(f"https://www.google.com/search?q=hi{search_terms[index]} used")
-        mvl[index] = f"https://www.google.com/search?q=hi{search_terms[index]} used"
-        try:
-            WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-                (By.ID, "main")
-            ))
-            time.sleep(1.0) # testing shows that an extra second allows all results to finish
+        curr_search_terms = [search_terms[index] + " used price"] + adv_search_terms[index]
+        # advanced iterations with different search terms until out of options or found price
+        while not (mvf[index] or len(curr_search_terms) == 0):
+            chrome_options = Options()
+            if HEADLESS:
+                chrome_options.add_argument("--headless") 
+            search_term = curr_search_terms.pop(0)
+            driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options)
+            driver.get(f"https://www.google.com/search?q={search_term}")
+            mvl[index] = f"https://www.google.com/search?q={search_term}"
             
-            main_element = driver.find_element(by=By.ID, value="main")
-            dom_text = main_element.text
-            dollar_value = parseDollarValue(dom_text)
-            if dollar_value > 999:
-                mvf[index] = dollar_value
+            try:
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+                    (By.ID, "main")
+                ))
+                time.sleep(1.0) # testing shows that an extra second allows all results to finish
                 
-        finally:
-            driver.quit()
+                main_element = driver.find_element(by=By.ID, value="main")
+                dom_text = main_element.text
+                dollar_value = parseDollarValue(dom_text)
+                if dollar_value > 100:
+                    google_price_decrease = 0.88
+                    mvf[index] = google_price_decrease * dollar_value
+            finally:
+                driver.quit()
     
     i = n - 1
     # start scraping where it was last stopped
@@ -627,8 +669,10 @@ def main():
 
     # get online prices and create dictionary
     search_terms = get_search_terms(data)
+    adv_search_terms = get_adv_search_terms(data)
     dict = getDict(data)
     dict['Search Terms'] = search_terms
+    dict['Advanced Search Terms'] = adv_search_terms
     scrapeAskingValues(dict)
     scrapeAuctionValues(dict)
     scrapeGeneralMarketValues(dict)
