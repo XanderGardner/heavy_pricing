@@ -488,7 +488,7 @@ def scrapeGeneralMarketValues(dict):
 # adds validated market values to dict with the key "Market Value Found" given the dict has the key-value 
 # pairs for "Auction Value Found" and "General Market Value Found" and "Asking Value Found" 
 # uses previous market value found in data to validate found prices according to MAX_INCREASE and MAX_DECREASE
-# returns the percent of successful market values found
+# returns the number of successful market values found
 def setMarketValues(dict, data):
     n = len(data["Auction Value"])
 
@@ -540,7 +540,7 @@ def setMarketValues(dict, data):
             successes += 1
     
     dict["Market Value Found"] = market_values
-    return successes / n
+    return successes
 
 # arr_values is 2d array. Each item is an array representing data for a column 
 # arr_col_strs is array of strings. arr_col_strs at index i is the col for arr_values at i
@@ -654,9 +654,28 @@ def setExcel(dict):
     wb.save('Equipment New List.xlsx')
 
 def main():
-    # output notes from program
-    file = open('temp_output.txt', 'w')
-    file.write(f"Data Collection began at {datetime.now()}\n")
+    # output intro screen
+    i = 10 
+    print("")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+    print("           /$$$$$$                                          ")
+    print("          /$$__  $$                                         ")
+    print("         | $$  \__/  /$$$$$$   /$$$$$$   /$$$$$$   /$$$$$$$ ")
+    print("         | $$       /$$__  $$ /$$__  $$ /$$__  $$ /$$_____/ ")
+    print("         | $$      | $$$$$$$$| $$  \__/| $$$$$$$$|  $$$$$$  ")
+    print("         | $$    $$| $$_____/| $$      | $$_____/ \____  $$ ")
+    print("         |  $$$$$$/|  $$$$$$$| $$      |  $$$$$$$ /$$$$$$$/ ")
+    print("          \______/  \_______/|__/       \_______/|_______/  \n\n")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+    print("             Heavy Pricing Tool developed by Xander Gardner\n\n")
+    print("    - Please do NOT use computer while running\n")
+    print("    - Expect to wait several hours\n")
+    print("    - Refer to heavy_pricing_guide.pdf for details\n\n")
+    print("Starting in 10 seconds")
+    time.sleep(10)
+
+    # record start time
+    start_time_sec = time.time()
 
     # create a copy of the master
     original = r'Equipment Master List.xlsx'
@@ -678,15 +697,31 @@ def main():
     scrapeGeneralMarketValues(dict)
 
     # calculate market price and validate values found
-    success_percent = setMarketValues(dict, data)
-    file.write(f"Successful market values found: {round(success_percent * 100, 2)}%\n")
-
+    success = setMarketValues(dict, data)
+    
     # write data in dict to 'Equipment New List.xlsx'
     setExcel(dict)
+    stop_time_sec = time.time()
 
-    # close output file
-    file.write(f"Finished at {datetime.now()}")
-    file.close()
+    # output closing screen
+    n = len(dict['Search Terms'])
+    success_percent = round(success / n * 100, 2)
+    total_time_sec = stop_time_sec - start_time_sec
+    total_time_min = total_time_sec / 60
+    time_hours = total_time_sec // 3600
+    time_minutes = (total_time_sec % 3600) // 60
+    time_seconds = total_time_sec % 60 // 1
+    priced_per_minute = round(success / total_time_min, 2)
+
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+    print("COMPLETE!\n\n")
+    print(f"    - {success} ({success_percent}%) market values found in {time_hours} hours {time_minutes} minutes and {time_seconds} seconds")
+    print(f"    - {priced_per_minute} item market values per minute")
+    print(f"    - Output is in \"Equipment New List.xlsx\"\n\n")
+    print("Closing in 30 seconds")
+    time.sleep(30)
 
 if __name__ == "__main__":
     main()
