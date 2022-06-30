@@ -519,18 +519,17 @@ def setMarketValues(dict, data):
             asvf[i] = None
             asvf_link[i] = None
         
-        increase_auction = 1.1
+        # examine how previous research shows getting market value from asking values
         decrease_asking = 0.9
-        # examine how previous research shows getting market value from auction and asking values
-        if mv[i] and auv[i]:
-            increase_auction = 1 + (mv[i] - auv[i]) / auv[i]
         if mv[i] and asv[i]:
             decrease_asking = 1 + (mv[i] - asv[i]) / asv[i]
+        if decrease_asking <= 0 or decrease_asking >= 1:
+            decrease_asking = 0.9
 
         # find new market value
         values_to_avg = []
         if auvf[i]:
-            values_to_avg.append(auvf[i] * increase_auction)
+            values_to_avg.append(auvf[i])
         if gmvf[i]:
             values_to_avg.append(gmvf[i])
         if asvf[i]:
