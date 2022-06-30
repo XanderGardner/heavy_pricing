@@ -161,13 +161,15 @@ def get_search_terms(data):
 def get_adv_search_terms(data):
     n = len(data['Emco'])
     adv_search_terms = [None] * n
+    # find many ways of searching for each item
     for i in range(n):
-        # find many ways of search for this item
-        manufacturer = data['Manufacturer'][i]
-        model = data['Model'][i]
-        description = data['Description'][i]
-        model_year = data['ModelYr'][i]
+        # get string values for the item
+        manufacturer = str(data['Manufacturer'][i]) if data['Manufacturer'][i] else None
+        model = str(data['Model'][i]) if data['Model'][i] else None
+        description = str(data['Description'][i]) if data['Description'][i] else None
+        model_year = str(data['ModelYr'][i]) if data['ModelYr'][i] else None
 
+        # create search terms
         curr_terms = []
         if description and model and model_year:
             curr_terms.append(' '.join([description, model, model_year, "used price"]))
