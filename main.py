@@ -15,7 +15,7 @@ import time
 
 # INPUT/ CONSTANTS
 SAVE_EVERY = 50 # save excel after every SAVE_EVERY number of elements scraped
-MAX_NUM_TO_SCRAPE = 99999 # max number of elements to scrape (set high to scrape everything)
+MAX_NUM_TO_SCRAPE = 999999 # max number of elements to scrape (set high to scrape everything)
 MAX_INCREASE = 2 # max amount allowed for given auction value to increase before result is not used
 MAX_DECREASE = 0.4 # max amount allowed for given auction value to decrease before result is not used
 HEADLESS = True # if running with chrome browser showing
@@ -421,8 +421,62 @@ def scrapeGeneralMarketValues(dict):
 
     # nested function for threaded scraping
     def scrape_task(index):
+        def scrape_engine(address):
+            price = None
+            chrome_options = Options()
+            if HEADLESS:
+                chrome_options.add_argument("--headless")
+            driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options)
+            driver.get(address)
+            # mvl[index] += address + " "
+            
+            try:
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+                    (By.TAG_NAME, "body")
+                ))
+                time.sleep(1.0) # testing shows that an extra second allows all results to load
+                
+                main_element = driver.find_element(by=By.TAG_NAME, value="body")
+                dom_text = main_element.text
+                dollar_value = parseDollarValue(dom_text)
+                if dollar_value > 100:
+                    engine_price_decrease = 0.88
+                    price = engine_price_decrease * dollar_value
+            finally:
+                driver.quit()
+                return price
+
+        # search all search engines
         curr_search_terms = [search_terms[index] + " used price"] + adv_search_terms[index]
-        # advanced iterations with different search terms until out of options or found price
+        prices = []
+        price = scrape_engine(f"https://www.bing.com/search?q={curr_search_terms[0]}")
+        if price:
+            prices.append(price)
+        price = scrape_engine(f"https://swisscows.com/web?query={curr_search_terms[0]}")
+        if price:
+            prices.append(price)
+        price = scrape_engine(f"https://duckduckgo.com/?q={curr_search_terms[0]}&ia=web")
+        if price:
+            prices.append(price)
+        price = scrape_engine(f"https://gibiru.com/results.html?q={curr_search_terms[0]}")
+        if price:
+            prices.append(price)
+        price = scrape_engine(f"https://search.givewater.com/serp?q={curr_search_terms[0]}")
+        if price:
+            prices.append(price)
+        price = scrape_engine(f"https://ekoru.org/?q={curr_search_terms[0]}")
+        if price:
+            prices.append(price)
+        price = scrape_engine(f"https://www.ecosia.org/search?method=index&q={curr_search_terms[0]}")
+        if price:
+            prices.append(price)
+        price = scrape_engine(f"https://search.brave.com/search?q={curr_search_terms[0]}&source=web")
+        if price:
+            prices.append(price)
+        if len(prices) >= 1:
+            mvf[index] = sum(prices) / len(prices)
+        
+        # advanced iterations with different search terms until out of options or found price on google
         while not (mvf[index] or len(curr_search_terms) == 0):
             chrome_options = Options()
             if HEADLESS:
