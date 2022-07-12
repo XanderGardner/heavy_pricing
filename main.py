@@ -15,10 +15,10 @@ import time
 
 # INPUT/ CONSTANTS
 SAVE_EVERY = 50 # save excel after every SAVE_EVERY number of elements scraped
-MAX_NUM_TO_SCRAPE = 999999 # max number of elements to scrape (set high to scrape everything)
+MAX_NUM_TO_SCRAPE = 9999999 # max number of elements to scrape (set high to scrape everything)
 MAX_INCREASE = 2 # max amount allowed for given auction value to increase before result is not used
 MAX_DECREASE = 0.4 # max amount allowed for given auction value to decrease before result is not used
-HEADLESS = True # if running with chrome browser showing
+HEADLESS = False # if running with chrome browser showing (more results when false, but takes longer)
 
 MAX_THREADS = 10 # max reasonable number of threads as each thread has a chomium driver
 OFFSET = 2 # excel input data is offset by 2: 1 for 0 indexing and 1 for a row of titles
@@ -64,6 +64,20 @@ def getExcelValues():
     a21 = [None] * n
     a22 = [None] * n
     a23 = [None] * n
+    a24 = [None] * n
+    a25 = [None] * n
+    a26 = [None] * n
+    a27 = [None] * n
+    a28 = [None] * n
+    a29 = [None] * n
+    a30 = [None] * n
+    a31 = [None] * n
+    a32 = [None] * n
+    a33 = [None] * n
+    a34 = [None] * n
+    a35 = [None] * n
+    a36 = [None] * n
+    a37 = [None] * n
     
     i = 0
     while i != n:
@@ -90,6 +104,20 @@ def getExcelValues():
         a21[i] = ws[f'U{i+OFFSET}'].value
         a22[i] = ws[f'V{i+OFFSET}'].value
         a23[i] = ws[f'W{i+OFFSET}'].value
+        a24[i] = ws[f'X{i+OFFSET}'].value
+        a25[i] = ws[f'Y{i+OFFSET}'].value
+        a26[i] = ws[f'Z{i+OFFSET}'].value
+        a27[i] = ws[f'AA{i+OFFSET}'].value
+        a28[i] = ws[f'AB{i+OFFSET}'].value
+        a29[i] = ws[f'AC{i+OFFSET}'].value
+        a30[i] = ws[f'AD{i+OFFSET}'].value
+        a31[i] = ws[f'AE{i+OFFSET}'].value
+        a32[i] = ws[f'AF{i+OFFSET}'].value
+        a33[i] = ws[f'AG{i+OFFSET}'].value
+        a34[i] = ws[f'AH{i+OFFSET}'].value
+        a35[i] = ws[f'AI{i+OFFSET}'].value
+        a36[i] = ws[f'AJ{i+OFFSET}'].value
+        a37[i] = ws[f'AK{i+OFFSET}'].value
         
         i += 1
     
@@ -114,10 +142,26 @@ def getExcelValues():
         'Market Value Found' : a17,
         'Auction Value Found' : a18,
         'Auction Value Link' : a19,
-        'General Market Value Found' : a20,
-        'General Market Value Link' : a21,
-        'Asking Value Found' : a22,
-        'Asking Value Link' : a23,
+        'Asking Value Found' : a20,
+        'Asking Value Link' : a21,
+        'gmvf1' : a20,
+        'gmvl1' : a21,
+        'gmvf2' : a22,
+        'gmvl2' : a23,
+        'gmvf3' : a24,
+        'gmvl3' : a25,
+        'gmvf4' : a26,
+        'gmvl4' : a27,
+        'gmvf5' : a28,
+        'gmvl5' : a29,
+        'gmvf6' : a30,
+        'gmvl6' : a31,
+        'gmvf7' : a32,
+        'gmvl7' : a33,
+        'gmvf8' : a34,
+        'gmvl8' : a35,
+        'gmvf9' : a36,
+        'gmvl9' : a37,
     }
 
     return data
@@ -132,10 +176,12 @@ def getDict(data):
     dict['Market Value Found'] = list(map(int_none, data['Market Value Found']))
     dict['Auction Value Found'] = list(map(int_none, data['Auction Value Found']))
     dict['Auction Value Link'] = data['Auction Value Link'][:]
-    dict['General Market Value Found'] = list(map(int_none, data['General Market Value Found']))
-    dict['General Market Value Link'] = data['General Market Value Link'][:]
     dict['Asking Value Found'] = list(map(int_none, data['Asking Value Found']))
     dict['Asking Value Link'] = data['Asking Value Link'][:]
+    for i in range(1, 10):
+        dict[f'gmvf{i}'] = list(map(int_none, data[f'gmvf{i}']))
+        dict[f'gmvl{i}'] = data[f'gmvl{i}'][:]
+    
     return dict
 
 # create search term for each item in data and return as array of search term strings
@@ -216,7 +262,6 @@ def scrapeAskingValues(dict):
             chrome_options.add_argument("--headless") 
         driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options) 
         driver.get(f"https://usedequipmentguide.com/listings?query={search_terms[index]}")
-        avl[index] = f"https://usedequipmentguide.com/listings?query={search_terms[index]}"
         try:
             WebDriverWait(driver, 10).until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "span.Span-hup779-0.sc-16afded-0.kzgLyd")
@@ -229,6 +274,7 @@ def scrapeAskingValues(dict):
             while i < len(elements):
                 if elements[i].text != "AUCTION" and elements[i].text != "Price Unavailable" and parseDollarValue(elements[i].text) > 999:
                     avf[index] = parseDollarValue(elements[i].text)
+                    avl[index] = f"https://usedequipmentguide.com/listings?query={search_terms[index]}"
                     break
                 i += 1
         
@@ -307,7 +353,6 @@ def scrapeAuctionValues(dict):
             chrome_options.add_argument("--headless") 
         driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options) 
         driver.get(f"https://www.ebay.com/sch/i.html?_from=R40&_nkw={search_terms[index]}&_sacat=6001&rt=nc&LH_Sold=1&LH_Complete=1")
-        avl[index] = f"https://www.ebay.com/sch/i.html?_from=R40&_nkw={search_terms[index]}&_sacat=6001&rt=nc&LH_Sold=1&LH_Complete=1"
         try:
             WebDriverWait(driver, 10).until(EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "li.s-item.s-item__pl-on-bottom")
@@ -324,6 +369,7 @@ def scrapeAuctionValues(dict):
             dollar_value = parseDollarValue(str_dollar_value)
             if (len(results_num_el) == 0 or results_num_el[0].text[0] != "0") and dollar_value > 999 and main_num != "0":
                 avf[index] = dollar_value
+                avl[index] = f"https://www.ebay.com/sch/i.html?_from=R40&_nkw={search_terms[index]}&_sacat=6001&rt=nc&LH_Sold=1&LH_Complete=1"
                 
         finally:
             driver.quit()
@@ -375,10 +421,26 @@ def scrapeGeneralMarketValues(dict):
     search_terms = dict['Search Terms']
     adv_search_terms = dict['Advanced Search Terms']
     n = len(search_terms)
-    mvf = dict['General Market Value Found'] # general market values found
-    mvl = dict['General Market Value Link'] # general market value links
+    gmvf1 = dict['gmvf1']
+    gmvl1 = dict['gmvl1']
+    gmvf2 = dict['gmvf2']
+    gmvl2 = dict['gmvl2']
+    gmvf3 = dict['gmvf3']
+    gmvl3 = dict['gmvl3']
+    gmvf4 = dict['gmvf4']
+    gmvl4 = dict['gmvl4']
+    gmvf5 = dict['gmvf5']
+    gmvl5 = dict['gmvl5']
+    gmvf6 = dict['gmvf6']
+    gmvl6 = dict['gmvl6']
+    gmvf7 = dict['gmvf7']
+    gmvl7 = dict['gmvl7']
+    gmvf8 = dict['gmvf8']
+    gmvl8 = dict['gmvl8']
+    gmvf9 = dict['gmvf9']
+    gmvl9 = dict['gmvl9']
     
-    # google: find dollar signs
+    # return average dollar seen or -1 if not valid
     def parseDollarValue(dom_text):
         arr_dom_text = dom_text.split()
         dollar_strs = []
@@ -428,7 +490,6 @@ def scrapeGeneralMarketValues(dict):
                 chrome_options.add_argument("--headless")
             driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options)
             driver.get(address)
-            # mvl[index] += address + " "
             
             try:
                 WebDriverWait(driver, 10).until(EC.presence_of_element_located(
@@ -448,43 +509,47 @@ def scrapeGeneralMarketValues(dict):
 
         # search all search engines
         curr_search_terms = [search_terms[index] + " used price"] + adv_search_terms[index]
-        prices = []
         price = scrape_engine(f"https://www.bing.com/search?q={curr_search_terms[0]}")
         if price:
-            prices.append(price)
+            gmvf1[index] = price
+            gmvl1[index] = f"https://www.bing.com/search?q={curr_search_terms[0]}"
         price = scrape_engine(f"https://swisscows.com/web?query={curr_search_terms[0]}")
         if price:
-            prices.append(price)
+            gmvf2[index] = price
+            gmvl2[index] = f"https://swisscows.com/web?query={curr_search_terms[0]}"
         price = scrape_engine(f"https://duckduckgo.com/?q={curr_search_terms[0]}&ia=web")
         if price:
-            prices.append(price)
+            gmvf3[index] = price
+            gmvl3[index] = f"https://duckduckgo.com/?q={curr_search_terms[0]}&ia=web"
         price = scrape_engine(f"https://gibiru.com/results.html?q={curr_search_terms[0]}")
         if price:
-            prices.append(price)
+            gmvf4[index] = price
+            gmvl4[index] = f"https://gibiru.com/results.html?q={curr_search_terms[0]}"
         price = scrape_engine(f"https://search.givewater.com/serp?q={curr_search_terms[0]}")
         if price:
-            prices.append(price)
+            gmvf5[index] = price
+            gmvl5[index] = f"https://search.givewater.com/serp?q={curr_search_terms[0]}"
         price = scrape_engine(f"https://ekoru.org/?q={curr_search_terms[0]}")
         if price:
-            prices.append(price)
+            gmvf6[index] = price
+            gmvl6[index] = f"https://ekoru.org/?q={curr_search_terms[0]}"
         price = scrape_engine(f"https://www.ecosia.org/search?method=index&q={curr_search_terms[0]}")
         if price:
-            prices.append(price)
+            gmvf7[index] = price
+            gmvl7[index] = f"https://www.ecosia.org/search?method=index&q={curr_search_terms[0]}"
         price = scrape_engine(f"https://search.brave.com/search?q={curr_search_terms[0]}&source=web")
         if price:
-            prices.append(price)
-        if len(prices) >= 1:
-            mvf[index] = sum(prices) / len(prices)
+            gmvf8[index] = price
+            gmvl8[index] = f"https://search.brave.com/search?q={curr_search_terms[0]}&source=web"
         
         # advanced iterations with different search terms until out of options or found price on google
-        while not (mvf[index] or len(curr_search_terms) == 0):
+        while not (gmvf9[index] or len(curr_search_terms) == 0 or gmvf8[index] or gmvf7[index] or gmvf6[index] or gmvf5[index] or gmvf4[index] or gmvf3[index] or gmvf2[index] or gmvf1[index]):
             chrome_options = Options()
             if HEADLESS:
                 chrome_options.add_argument("--headless") 
             search_term = curr_search_terms.pop(0)
             driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options)
             driver.get(f"https://www.google.com/search?q={search_term}")
-            mvl[index] = f"https://www.google.com/search?q={search_term}"
             
             try:
                 WebDriverWait(driver, 10).until(EC.presence_of_element_located(
@@ -497,13 +562,14 @@ def scrapeGeneralMarketValues(dict):
                 dollar_value = parseDollarValue(dom_text)
                 if dollar_value > 100:
                     google_price_decrease = 0.88
-                    mvf[index] = google_price_decrease * dollar_value
+                    gmvf9[index] = google_price_decrease * dollar_value
+                    gmvl9[index] = f"https://www.google.com/search?q={search_term}"
             finally:
                 driver.quit()
     
     i = n - 1
     # start scraping where it was last stopped
-    while not (i == -1 or mvf[i]):
+    while not (i == -1 or gmvf1[i] or gmvf2[i] or gmvf3[i] or gmvf4[i] or gmvf5[i] or gmvf6[i] or gmvf7[i] or gmvf8[i] or gmvf9[i]):
         i -= 1
     i += 1  
     while i < n:
@@ -522,8 +588,24 @@ def scrapeGeneralMarketValues(dict):
         if i % SAVE_EVERY == 0:
             row_start = i-SAVE_EVERY
             temp_dict = {
-                'General Market Value Found' : mvf[i-SAVE_EVERY:i],
-                'General Market Value Link' : mvl[i-SAVE_EVERY:i]
+                'gmvf1' : gmvf1[i-SAVE_EVERY:i],
+                'gmvl1' : gmvl1[i-SAVE_EVERY:i],
+                'gmvf2' : gmvf2[i-SAVE_EVERY:i],
+                'gmvl2' : gmvl2[i-SAVE_EVERY:i],
+                'gmvf3' : gmvf3[i-SAVE_EVERY:i],
+                'gmvl3' : gmvl3[i-SAVE_EVERY:i],
+                'gmvf4' : gmvf4[i-SAVE_EVERY:i],
+                'gmvl4' : gmvl4[i-SAVE_EVERY:i],
+                'gmvf5' : gmvf5[i-SAVE_EVERY:i],
+                'gmvl5' : gmvl5[i-SAVE_EVERY:i],
+                'gmvf6' : gmvf6[i-SAVE_EVERY:i],
+                'gmvl6' : gmvl6[i-SAVE_EVERY:i],
+                'gmvf7' : gmvf7[i-SAVE_EVERY:i],
+                'gmvl7' : gmvl7[i-SAVE_EVERY:i],
+                'gmvf8' : gmvf8[i-SAVE_EVERY:i],
+                'gmvl8' : gmvl8[i-SAVE_EVERY:i],
+                'gmvf9' : gmvf9[i-SAVE_EVERY:i],
+                'gmvl9' : gmvl9[i-SAVE_EVERY:i]
             }
             tempSetExcel(temp_dict, row_start)
 
@@ -533,8 +615,24 @@ def scrapeGeneralMarketValues(dict):
     if row_start < 0:
         row_start = 0
     temp_dict = {
-        'General Market Value Found' : mvf[i-SAVE_EVERY:i],
-        'General Market Value Link' : mvl[i-SAVE_EVERY:i]
+        'gmvf1' : gmvf1[i-SAVE_EVERY:i],
+        'gmvl1' : gmvl1[i-SAVE_EVERY:i],
+        'gmvf2' : gmvf2[i-SAVE_EVERY:i],
+        'gmvl2' : gmvl2[i-SAVE_EVERY:i],
+        'gmvf3' : gmvf3[i-SAVE_EVERY:i],
+        'gmvl3' : gmvl3[i-SAVE_EVERY:i],
+        'gmvf4' : gmvf4[i-SAVE_EVERY:i],
+        'gmvl4' : gmvl4[i-SAVE_EVERY:i],
+        'gmvf5' : gmvf5[i-SAVE_EVERY:i],
+        'gmvl5' : gmvl5[i-SAVE_EVERY:i],
+        'gmvf6' : gmvf6[i-SAVE_EVERY:i],
+        'gmvl6' : gmvl6[i-SAVE_EVERY:i],
+        'gmvf7' : gmvf7[i-SAVE_EVERY:i],
+        'gmvl7' : gmvl7[i-SAVE_EVERY:i],
+        'gmvf8' : gmvf8[i-SAVE_EVERY:i],
+        'gmvl8' : gmvl8[i-SAVE_EVERY:i],
+        'gmvf9' : gmvf9[i-SAVE_EVERY:i],
+        'gmvl9' : gmvl9[i-SAVE_EVERY:i]
     }
     tempSetExcel(temp_dict, row_start)
 
@@ -549,15 +647,30 @@ def setMarketValues(dict, data):
     n = len(data["Auction Value"])
 
     auvf = dict["Auction Value Found"]
-    gmvf = dict["General Market Value Found"]
+    auvf_link = dict["Auction Value Link"]
     asvf = dict["Asking Value Found"]
+    asvf_link = dict["Asking Value Link"]
+    gmvf1 = dict['gmvf1']
+    gmvl1 = dict['gmvl1']
+    gmvf2 = dict['gmvf2']
+    gmvl2 = dict['gmvl2']
+    gmvf3 = dict['gmvf3']
+    gmvl3 = dict['gmvl3']
+    gmvf4 = dict['gmvf4']
+    gmvl4 = dict['gmvl4']
+    gmvf5 = dict['gmvf5']
+    gmvl5 = dict['gmvl5']
+    gmvf6 = dict['gmvf6']
+    gmvl6 = dict['gmvl6']
+    gmvf7 = dict['gmvf7']
+    gmvl7 = dict['gmvl7']
+    gmvf8 = dict['gmvf8']
+    gmvl8 = dict['gmvl8']
+    gmvf9 = dict['gmvf9']
+    gmvl9 = dict['gmvl9']
     auv = data["Auction Value"]
     mv  = data["Market Value"]
     asv = data["Asking Value"]
-
-    auvf_link = dict["Auction Value Link"]
-    gmvf_link = dict["General Market Value Link"]
-    asvf_link = dict["Asking Value Link"]
 
     market_values = [None] * n
     successes = 0
@@ -566,12 +679,36 @@ def setMarketValues(dict, data):
         if auvf[i] and auv[i] and (auvf[i] > auv[i] * MAX_INCREASE or auvf[i] < auv[i] * MAX_DECREASE):
             auvf[i] = None
             auvf_link[i] = None
-        if gmvf[i] and mv[i] and (gmvf[i] > mv[i] * MAX_INCREASE or gmvf[i] < mv[i] * MAX_DECREASE):
-            gmvf[i] = None
-            gmvf_link[i] = None
         if asvf[i] and asv[i] and (asvf[i] > asv[i] * MAX_INCREASE or asvf[i] < asv[i] * MAX_DECREASE):
             asvf[i] = None
             asvf_link[i] = None
+        if gmvf1[i] and mv[i] and (gmvf1[i] > mv[i] * MAX_INCREASE or gmvf1[i] < mv[i] * MAX_DECREASE):
+            gmvf1[i] = None
+            gmvl1[i] = None
+        if gmvf2[i] and mv[i] and (gmvf2[i] > mv[i] * MAX_INCREASE or gmvf2[i] < mv[i] * MAX_DECREASE):
+            gmvf2[i] = None
+            gmvl2[i] = None
+        if gmvf3[i] and mv[i] and (gmvf3[i] > mv[i] * MAX_INCREASE or gmvf3[i] < mv[i] * MAX_DECREASE):
+            gmvf3[i] = None
+            gmvl3[i] = None
+        if gmvf4[i] and mv[i] and (gmvf4[i] > mv[i] * MAX_INCREASE or gmvf4[i] < mv[i] * MAX_DECREASE):
+            gmvf4[i] = None
+            gmvl4[i] = None
+        if gmvf5[i] and mv[i] and (gmvf5[i] > mv[i] * MAX_INCREASE or gmvf5[i] < mv[i] * MAX_DECREASE):
+            gmvf5[i] = None
+            gmvl5[i] = None
+        if gmvf6[i] and mv[i] and (gmvf6[i] > mv[i] * MAX_INCREASE or gmvf6[i] < mv[i] * MAX_DECREASE):
+            gmvf6[i] = None
+            gmvl6[i] = None
+        if gmvf7[i] and mv[i] and (gmvf7[i] > mv[i] * MAX_INCREASE or gmvf7[i] < mv[i] * MAX_DECREASE):
+            gmvf7[i] = None
+            gmvl7[i] = None
+        if gmvf8[i] and mv[i] and (gmvf8[i] > mv[i] * MAX_INCREASE or gmvf8[i] < mv[i] * MAX_DECREASE):
+            gmvf8[i] = None
+            gmvl8[i] = None
+        if gmvf9[i] and mv[i] and (gmvf9[i] > mv[i] * MAX_INCREASE or gmvf9[i] < mv[i] * MAX_DECREASE):
+            gmvf9[i] = None
+            gmvl9[i] = None
         
         # examine how previous research shows getting market value from asking values
         decrease_asking = 0.9
@@ -584,10 +721,27 @@ def setMarketValues(dict, data):
         values_to_avg = []
         if auvf[i]:
             values_to_avg.append(auvf[i])
-        if gmvf[i]:
-            values_to_avg.append(gmvf[i])
         if asvf[i]:
             values_to_avg.append(asvf[i] * decrease_asking)
+        if gmvf1[i]:
+            values_to_avg.append(gmvf1[i])
+        if gmvf2[i]:
+            values_to_avg.append(gmvf2[i])
+        if gmvf3[i]:
+            values_to_avg.append(gmvf3[i])
+        if gmvf4[i]:
+            values_to_avg.append(gmvf4[i])
+        if gmvf5[i]:
+            values_to_avg.append(gmvf5[i])
+        if gmvf6[i]:
+            values_to_avg.append(gmvf6[i])
+        if gmvf7[i]:
+            values_to_avg.append(gmvf7[i])
+        if gmvf8[i]:
+            values_to_avg.append(gmvf8[i])
+        if gmvf9[i]:
+            values_to_avg.append(gmvf9[i])
+        
         
         # set found market value
         if len(values_to_avg) > 0:
@@ -626,43 +780,36 @@ def tempSetExcel(dict, row_start):
             ws[f'S{row + OFFSET}'] = val
             row += 1
 
-    # set market values found if they are given
-    if 'General Market Value Found' in dict:
-        row = row_start
-        for val in dict['General Market Value Found']:
-            ws[f'T{row + OFFSET}'] = val
-            row += 1
-    
-    # set market value links found if they are given
-    if 'General Market Value Link' in dict:
-        row = row_start
-        for val in dict['General Market Value Link']:
-            ws[f'U{row + OFFSET}'] = val
-            row += 1
-    
     # set asking values if they are given
     if 'Asking Value Found' in dict:
         row = row_start
         for val in dict['Asking Value Found']:
-            ws[f'V{row + OFFSET}'] = val
+            ws[f'T{row + OFFSET}'] = val
             row += 1
 
     # set asking value links if they are given
     if 'Asking Value Link' in dict:
         row = row_start
         for val in dict['Asking Value Link']:
-            ws[f'W{row + OFFSET}'] = val
+            ws[f'U{row + OFFSET}'] = val
             row += 1
 
-    # set search terms if they are given
-    if 'Search Terms' in dict:
-        row = row_start
-        for val in dict['Search Terms']:
-            ws[f'X{row + OFFSET}'] = val
-            row += 1
+    for i in range(1, 10):
+        # set market values found if they are given
+        if f'gmvf{i}' in dict:
+            row = row_start
+            for val in dict[f'gmvf{i}']:
+                ws[f'V{row + OFFSET}'] = val
+                row += 1
+        
+        # set market value links found if they are given
+        if f'gmvl{i}' in dict:
+            row = row_start
+            for val in dict[f'gmvl{i}']:
+                ws[f'W{row + OFFSET}'] = val
+                row += 1
 
     wb.save('Equipment New List.xlsx')
-
 
 # sets given final prices in 'Equipment New List.xlsx'
 def setExcel(dict):
@@ -677,14 +824,18 @@ def setExcel(dict):
         ws[f'R1'] = 'Auction Value Found'
     if 'Auction Value Link' in dict:
         ws[f'S1'] = 'Auction Value Link'
-    if 'General Market Value Found' in dict:
-        ws[f'T1'] = 'General Market Value Found'
-    if 'General Market Value Link' in dict:
-        ws[f'U1'] = 'General Market Value Link'
     if 'Asking Value Found' in dict:
-        ws[f'V1'] = 'Asking Value Found'
+        ws[f'T1'] = 'Asking Value Found'
     if 'Asking Value Link' in dict:
-        ws[f'W1'] = 'Asking Value Link'
+        ws[f'U1'] = 'Asking Value Link'
+    col = 22 # start column
+    for i in range(1, 10):
+        if f'gmvf{i}' in dict:
+            ws.cell(1,col).value = f'General Market Value Found {i}'
+        col += 1
+        if f'gmvl{i}' in dict:
+            ws.cell(1,col).value = f'General Market Value Link {i}'
+        col += 1
 
     # set values
     row = 0 + OFFSET
@@ -696,14 +847,18 @@ def setExcel(dict):
             ws[f'R{row}'] = dict['Auction Value Found'][row - OFFSET]
         if 'Auction Value Link' in dict:
             ws[f'S{row}'] = dict['Auction Value Link'][row - OFFSET]
-        if 'General Market Value Found' in dict:
-            ws[f'T{row}'] = dict['General Market Value Found'][row - OFFSET]
-        if 'General Market Value Link' in dict:
-            ws[f'U{row}'] = dict['General Market Value Link'][row - OFFSET]
         if 'Asking Value Found' in dict:
-            ws[f'V{row}'] = dict['Asking Value Found'][row - OFFSET]
+            ws[f'T{row}'] = dict['Asking Value Found'][row - OFFSET]
         if 'Asking Value Link' in dict:
-            ws[f'W{row}'] = dict['Asking Value Link'][row - OFFSET]
+            ws[f'U{row}'] = dict['Asking Value Link'][row - OFFSET]
+        col = 22 # start column
+        for i in range(1, 10):
+            if f'gmvf{i}' in dict:
+                ws.cell(row,col).value = dict[f'gmvf{i}'][row - OFFSET]
+            col += 1
+            if f'gmvl{i}' in dict:
+                ws.cell(row,col).value = dict[f'gmvl{i}'][row - OFFSET]
+            col += 1
         row += 1
 
     wb.save('Equipment New List.xlsx')
