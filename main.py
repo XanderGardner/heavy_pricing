@@ -14,8 +14,8 @@ from threading import Thread
 import time
 
 # INPUT/ CONSTANTS
-SAVE_EVERY = 50 # save excel after every SAVE_EVERY number of elements scraped
-MAX_NUM_TO_SCRAPE = 9999999 # max number of elements to scrape (set high to scrape everything)
+SAVE_EVERY = 10 # save excel after every SAVE_EVERY number of elements scraped
+MAX_NUM_TO_SCRAPE = 150 # max number of elements to scrape (set high to scrape everything)
 MAX_INCREASE = 2 # max amount allowed for given auction value to increase before result is not used
 MAX_DECREASE = 0.4 # max amount allowed for given auction value to decrease before result is not used
 HEADLESS = False # if running with chrome browser showing (more results when false, but takes longer)
@@ -78,6 +78,8 @@ def getExcelValues():
     a35 = [None] * n
     a36 = [None] * n
     a37 = [None] * n
+    a38 = [None] * n
+    a39 = [None] * n
     
     i = 0
     while i != n:
@@ -118,6 +120,8 @@ def getExcelValues():
         a35[i] = ws[f'AI{i+OFFSET}'].value
         a36[i] = ws[f'AJ{i+OFFSET}'].value
         a37[i] = ws[f'AK{i+OFFSET}'].value
+        a38[i] = ws[f'AL{i+OFFSET}'].value
+        a39[i] = ws[f'AM{i+OFFSET}'].value
         
         i += 1
     
@@ -144,24 +148,24 @@ def getExcelValues():
         'Auction Value Link' : a19,
         'Asking Value Found' : a20,
         'Asking Value Link' : a21,
-        'gmvf1' : a20,
-        'gmvl1' : a21,
-        'gmvf2' : a22,
-        'gmvl2' : a23,
-        'gmvf3' : a24,
-        'gmvl3' : a25,
-        'gmvf4' : a26,
-        'gmvl4' : a27,
-        'gmvf5' : a28,
-        'gmvl5' : a29,
-        'gmvf6' : a30,
-        'gmvl6' : a31,
-        'gmvf7' : a32,
-        'gmvl7' : a33,
-        'gmvf8' : a34,
-        'gmvl8' : a35,
-        'gmvf9' : a36,
-        'gmvl9' : a37,
+        'gmvf1' : a22,
+        'gmvl1' : a23,
+        'gmvf2' : a24,
+        'gmvl2' : a25,
+        'gmvf3' : a26,
+        'gmvl3' : a27,
+        'gmvf4' : a28,
+        'gmvl4' : a29,
+        'gmvf5' : a30,
+        'gmvl5' : a31,
+        'gmvf6' : a32,
+        'gmvl6' : a33,
+        'gmvf7' : a34,
+        'gmvl7' : a35,
+        'gmvf8' : a36,
+        'gmvl8' : a37,
+        'gmvf9' : a38,
+        'gmvl9' : a39,
     }
 
     return data
@@ -279,6 +283,7 @@ def scrapeAskingValues(dict):
                 i += 1
         
         finally:
+            driver.close()
             driver.quit()
     
     i = n - 1
@@ -362,16 +367,18 @@ def scrapeAuctionValues(dict):
             elements = driver.find_elements(by=By.CSS_SELECTOR, value="span.POSITIVE")
             
             # pick only relevent trucks and cars data
-            results_num_el = driver.find_elements(by=By.CSS_SELECTOR, value="span.section-notice__main")
-            main_results = driver.find_elements(by=By.CSS_SELECTOR, value="h1.srp-controls__count-heading")
-            main_num = main_results[0].text[0]
-            str_dollar_value = str(elements[1].text)  # 2nd element is the 1st most relevent price
-            dollar_value = parseDollarValue(str_dollar_value)
-            if (len(results_num_el) == 0 or results_num_el[0].text[0] != "0") and dollar_value > 999 and main_num != "0":
-                avf[index] = dollar_value
-                avl[index] = f"https://www.ebay.com/sch/i.html?_from=R40&_nkw={search_terms[index]}&_sacat=6001&rt=nc&LH_Sold=1&LH_Complete=1"
+            if elements[1]:
+                results_num_el = driver.find_elements(by=By.CSS_SELECTOR, value="span.section-notice__main")
+                main_results = driver.find_elements(by=By.CSS_SELECTOR, value="h1.srp-controls__count-heading")
+                main_num = main_results[0].text[0]
+                str_dollar_value = str(elements[1].text)  # 2nd element is the 1st most relevent price
+                dollar_value = parseDollarValue(str_dollar_value)
+                if (len(results_num_el) == 0 or results_num_el[0].text[0] != "0") and dollar_value > 999 and main_num != "0":
+                    avf[index] = dollar_value
+                    avl[index] = f"https://www.ebay.com/sch/i.html?_from=R40&_nkw={search_terms[index]}&_sacat=6001&rt=nc&LH_Sold=1&LH_Complete=1"
                 
         finally:
+            driver.close()
             driver.quit()
     
     i = n - 1
@@ -504,6 +511,7 @@ def scrapeGeneralMarketValues(dict):
                     engine_price_decrease = 0.88
                     price = engine_price_decrease * dollar_value
             finally:
+                driver.close()
                 driver.quit()
                 return price
 
@@ -565,6 +573,7 @@ def scrapeGeneralMarketValues(dict):
                     gmvf9[index] = google_price_decrease * dollar_value
                     gmvl9[index] = f"https://www.google.com/search?q={search_term}"
             finally:
+                driver.close()
                 driver.quit()
     
     i = n - 1
@@ -794,20 +803,23 @@ def tempSetExcel(dict, row_start):
             ws[f'U{row + OFFSET}'] = val
             row += 1
 
+    col = 22 # start column
     for i in range(1, 10):
         # set market values found if they are given
         if f'gmvf{i}' in dict:
             row = row_start
             for val in dict[f'gmvf{i}']:
-                ws[f'V{row + OFFSET}'] = val
+                ws.cell(row + OFFSET,col).value = val
                 row += 1
+        col += 1
         
         # set market value links found if they are given
         if f'gmvl{i}' in dict:
             row = row_start
             for val in dict[f'gmvl{i}']:
-                ws[f'W{row + OFFSET}'] = val
+                ws.cell(row + OFFSET,col).value = val
                 row += 1
+        col += 1
 
     wb.save('Equipment New List.xlsx')
 
