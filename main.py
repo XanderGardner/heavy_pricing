@@ -15,7 +15,7 @@ import time
 
 # INPUT/ CONSTANTS
 SAVE_EVERY = 10 # save excel after every SAVE_EVERY number of elements scraped
-MAX_NUM_TO_SCRAPE = 150 # max number of elements to scrape (set high to scrape everything)
+MAX_NUM_TO_SCRAPE = 999999 # max number of elements to scrape (set high to scrape everything)
 MAX_INCREASE = 2 # max amount allowed for given auction value to increase before result is not used
 MAX_DECREASE = 0.4 # max amount allowed for given auction value to decrease before result is not used
 HEADLESS = False # if running with chrome browser showing (more results when false, but takes longer)
@@ -291,6 +291,7 @@ def scrapeAskingValues(dict):
     while not (i == -1 or avf[i]):
         i -= 1
     i += 1  
+    i = i // SAVE_EVERY * SAVE_EVERY # corner case: round down to nearest SAVE_EVERY
     while i < n:
         # run next set of threads
         threads = [None] * MAX_THREADS
@@ -367,7 +368,7 @@ def scrapeAuctionValues(dict):
             elements = driver.find_elements(by=By.CSS_SELECTOR, value="span.POSITIVE")
             
             # pick only relevent trucks and cars data
-            if elements[1]:
+            if len(elements) >= 1:
                 results_num_el = driver.find_elements(by=By.CSS_SELECTOR, value="span.section-notice__main")
                 main_results = driver.find_elements(by=By.CSS_SELECTOR, value="h1.srp-controls__count-heading")
                 main_num = main_results[0].text[0]
@@ -386,6 +387,7 @@ def scrapeAuctionValues(dict):
     while not (i == -1 or avf[i]):
         i -= 1
     i += 1  
+    i = i // SAVE_EVERY * SAVE_EVERY # corner case: round down to nearest SAVE_EVERY
     while i < n:
         # run next set of threads
         threads = [None] * MAX_THREADS
@@ -581,6 +583,7 @@ def scrapeGeneralMarketValues(dict):
     while not (i == -1 or gmvf1[i] or gmvf2[i] or gmvf3[i] or gmvf4[i] or gmvf5[i] or gmvf6[i] or gmvf7[i] or gmvf8[i] or gmvf9[i]):
         i -= 1
     i += 1  
+    i = i // SAVE_EVERY * SAVE_EVERY # corner case: round down to nearest SAVE_EVERY
     while i < n:
         # run next set of threads
         threads = [None] * MAX_THREADS
