@@ -8,6 +8,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from threading import Thread
@@ -23,14 +25,6 @@ HEADLESS = False # if running with chrome browser showing (more results when fal
 MAX_THREADS = 10 # max reasonable number of threads as each thread has a chomium driver
 OFFSET = 2 # excel input data is offset by 2: 1 for 0 indexing and 1 for a row of titles
 OFFSET_ROWS = 2 # excel input data has 2 extra rows: first is headers, last row is totaled info
-
-# returns resource path for users environment given the relative path
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.dirname(__file__)
-    return os.path.join(base_path, relative_path)
 
 # imports data from 'Equipment New List.xlsx' and returns as a dictionary
 def getExcelValues():
@@ -263,8 +257,8 @@ def scrapeAskingValues(dict):
     def scrape_task(index):
         chrome_options = Options()
         if HEADLESS:
-            chrome_options.add_argument("--headless") 
-        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options) 
+            chrome_options.add_argument("--headless")
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
         driver.get(f"https://usedequipmentguide.com/listings?query={search_terms[index]}")
         try:
             WebDriverWait(driver, 10).until(EC.presence_of_element_located(
@@ -356,8 +350,8 @@ def scrapeAuctionValues(dict):
     def scrape_task(index):
         chrome_options = Options()
         if HEADLESS:
-            chrome_options.add_argument("--headless") 
-        driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options) 
+            chrome_options.add_argument("--headless")  
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
         driver.get(f"https://www.ebay.com/sch/i.html?_from=R40&_nkw={search_terms[index]}&_sacat=6001&rt=nc&LH_Sold=1&LH_Complete=1")
         try:
             WebDriverWait(driver, 10).until(EC.presence_of_element_located(
@@ -497,7 +491,7 @@ def scrapeGeneralMarketValues(dict):
             chrome_options = Options()
             if HEADLESS:
                 chrome_options.add_argument("--headless")
-            driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options)
+            driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
             driver.get(address)
             
             try:
@@ -558,7 +552,7 @@ def scrapeGeneralMarketValues(dict):
             if HEADLESS:
                 chrome_options.add_argument("--headless") 
             search_term = curr_search_terms.pop(0)
-            driver = webdriver.Chrome(resource_path('./chromedriver_win32/chromedriver.exe'), options=chrome_options)
+            driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
             driver.get(f"https://www.google.com/search?q={search_term}")
             
             try:
